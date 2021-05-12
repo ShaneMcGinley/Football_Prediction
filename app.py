@@ -16,6 +16,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import VotingClassifier
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import SGDClassifier
+from sklearn.neural_network import MLPClassifier
 
 #Create instance
 app = Flask(__name__)
@@ -40,16 +41,15 @@ avg_away_conceded_20_21 = avg_home_goals_20_21
 #Team, Home Goals Score, Away Goals Score, Attack Strength, Home Goals Conceded, Away Goals Conceded, Defensive Strength
 table_20 = pd.DataFrame(columns=('Team','HGS','AGS','HAS','AAS','HGC','AGC','HDS','ADS',))
 table_20 = table_20[:-10]
-table_20
 
-res_home_20 = df20_21.groupby('HomeTeam')
-res_away_20 = df20_21.groupby('AwayTeam')
+res_home_20 = df20_21.groupby('HomeTeam').agg(np.sum)
+res_away_20 = df20_21.groupby('AwayTeam').agg(np.sum)
 
-table_20.Team = res_home_20.HomeTeam.indices
-table_20.HGS = res_home_20.FTHG.sum().values
-table_20.HGC = res_home_20.FTAG.sum().values
-table_20.AGS = res_away_20.FTAG.sum().values
-table_20.AGC = res_away_20.FTHG.sum().values
+table_20.Team = res_home_20.index.values
+table_20.HGS = res_home_20.FTHG.values
+table_20.HGC = res_home_20.FTAG.values
+table_20.AGS = res_away_20.FTAG.values
+table_20.AGC = res_away_20.FTHG.values
 
 num_games_20 = df20_21.shape[0]/20
 
@@ -58,12 +58,6 @@ table_20.AAS = (table_20.AGS / num_games_20) / avg_away_goals_20_21
 table_20.HDS = (table_20.HGC / num_games_20) / avg_home_conceded_20_21
 table_20.ADS = (table_20.AGC / num_games_20) / avg_away_conceded_20_21
 
-''' 
-feature_table contains all the fixtures in the current season.
-ftr = full time result
-hst = home shots on target
-ast = away shots on target
-'''
 
 feature_table = feature_table[['HomeTeam','AwayTeam','FTR','HST','AST']]
 f_HAS = []
@@ -100,23 +94,20 @@ feature_table["Result"] = feature_table.apply(lambda row: transformResult(row),a
 x_train = feature_table[['HST','AST','HAS','HDS','AAS','ADS',]]
 y_train = feature_table['Result']
 
-ht = df20_21.loc[40].HomeTeam
-at = df20_21.loc[40].AwayTeam
-
 feat_table = df20_21.sort_index(ascending=False)
 feat_table = feat_table[['HomeTeam','AwayTeam','FTR','FTHG','FTAG','HS','AS','HC','AC']]
 
 # Adding next week fixtures
-new_fixtures = pd.DataFrame( [['Fulham','Wolves','D',0,0,0,0,0,0],
-                             ['Man City','Leeds United','D',0,0,0,0,0,0],
-                             ['Liverpool','Aston Villa','D',0,0,0,0,0,0],
-                             ['Crystal Palace','Chelsea','D',0,0,0,0,0,0],
-                             ['Burnley','Newcastle','D',0,0,0,0,0,0],
-                             ['West Ham','Leicester City','D',0,0,0,0,0,0],
-                             ['Tottenham','Man United','D',0,0,0,0,0,0],
-                             ['Sheffield United','Arsenal','D',0,0,0,0,0,0],
-                             ['West Brom','Southampton','D',0,0,0,0,0,0],
-                             ['Brighton','Everton','D',0,0,0,0,0,0]],columns=feat_table.columns)
+new_fixtures = pd.DataFrame( [['Southampton','Leicester City','D',0,0,0,0,0,0],
+                             ['Crystal Palace','Man City','D',0,0,0,0,0,0],
+                             ['Brighton','Leeds United','D',0,0,0,0,0,0],
+                             ['Chelsea','Fulham','D',0,0,0,0,0,0],
+                             ['Everton','Aston Villa','D',0,0,0,0,0,0],
+                             ['Newcastle','Arsenal','D',0,0,0,0,0,0],
+                             ['Man United','Liverpool','D',0,0,0,0,0,0],
+                             ['Tottenham','Sheffield United','D',0,0,0,0,0,0],
+                             ['West Brom','Wolves','D',0,0,0,0,0,0],
+                             ['Burnley','West Ham','D',0,0,0,0,0,0]],columns=feat_table.columns)
 							 
 new_feat_table = new_fixtures.append(feat_table,ignore_index=True)
 new_feat_table = new_feat_table.sort_index(ascending=False)
@@ -133,7 +124,7 @@ feat_table["pastHG"] = 0.0
 feat_table["pastAG"] = 0.0
 
 # Adding k recent performance metrics. Change value of k.
-k = 3
+k = 4
 for i in range(feat_table.shape[0]-1,-1,-1):
     row = feat_table.loc[i]
     ht = row.HomeTeam
@@ -214,6 +205,22 @@ for c in cs:
     scores = accuracy_score(y_test,clf_logreg.predict(X_test))
     plot_scores_logreg.append(scores)
 
+#MLP Classifier
+plot_scores_mlp = []
+for h in range(1,100):
+  clf_MLP = MLPClassifier(max_iter=h)
+  clf_MLP.fit(X_train, y_train)
+  scores = accuracy_score(y_test,clf_MLP.predict(X_test))
+  plot_scores_mlp.append(scores)
+
+#Linear SVC
+plot_scores_svlc = []
+for l in range(1,100):
+  clf_SVLC = LinearSVC(max_iter=l)
+  clf_SVLC.fit(X_train, y_train)
+  scores = accuracy_score(y_test,clf_SVLC.predict(X_test))
+  plot_scores_svlc.append(scores)
+
 max_knn_n = max(plot_scores_knn)
 max_knn_ind = plot_scores_knn.index(max_knn_n)
 
@@ -223,19 +230,31 @@ max_XGB_ind = plot_scores_XGB.index(max_XGB_e) if plot_scores_XGB.index(max_XGB_
 max_logreg_c = max(plot_scores_logreg)
 max_logreg_ind = plot_scores_logreg.index(max_logreg_c)
 
+max_mlp_c = max(plot_scores_mlp)
+max_mlp_ind = plot_scores_mlp.index(max_mlp_c)
+
+max_svlc_c = max(plot_scores_svlc)
+max_svlc_ind = plot_scores_svlc.index(max_svlc_c)
+
 
 clf_knn = KNeighborsClassifier(n_neighbors=max_knn_ind).fit(X_train,y_train)
 clf_XGB = XGBClassifier(n_estimators=max_XGB_ind).fit(X_train,y_train)
 clf_logreg = LogisticRegression(C=max_logreg_ind,solver='lbfgs',multi_class='ovr').fit(X_train,y_train)
+clf_MLP = MLPClassifier(max_iter=max_mlp_ind).fit(X_train, y_train)
+clf_LSVC = LinearSVC(max_iter=5000, dual=False).fit(X_train, y_train)
 
 y_pred_knn = clf_knn.predict(X_predict)
 y_pred_XGB = clf_XGB.predict(X_predict)
 y_pred_logreg = clf_logreg.predict(X_predict)
+y_pred_mpl = clf_MLP.predict(X_predict)
+y_pred_lsvc = clf_LSVC.predict(X_predict)
 
 this_week = test_table[['HomeTeam','AwayTeam']].loc[num_games:]
 this_week['Result_knn']=y_pred_knn
 this_week['Result_XGB']=y_pred_XGB
 this_week['Result_logreg']=y_pred_logreg
+this_week['Result_MLP']=y_pred_mpl
+this_week['Result_LSVC']=y_pred_lsvc
 
 def transformResultBack(row,col_name):
     if(row[col_name] == 1):
@@ -248,10 +267,11 @@ def transformResultBack(row,col_name):
 this_week["Res_knn"] = this_week.apply(lambda row: transformResultBack(row,"Result_knn"),axis=1)
 this_week["Res_XGB"] = this_week.apply(lambda row: transformResultBack(row,"Result_XGB"),axis=1)
 this_week["Res_logreg"] = this_week.apply(lambda row: transformResultBack(row,"Result_logreg"),axis=1)
+this_week["Res_MLP"] = this_week.apply(lambda row: transformResultBack(row,"Result_MLP"),axis=1)
+this_week["Res_LSVC"] = this_week.apply(lambda row: transformResultBack(row,"Result_LSVC"),axis=1)
 
-this_week.drop(["Result_knn", "Result_XGB","Result_logreg"],axis=1,inplace=True)
+this_week.drop(["Result_knn", "Result_XGB","Result_logreg","Result_MLP","Result_LSVC"],axis=1,inplace=True)
 
-this_week
 
 
 #Use app as a decorator to create each route/url that is provided by the application
