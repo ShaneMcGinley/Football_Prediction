@@ -21,7 +21,7 @@ from sklearn.neural_network import MLPClassifier
 #Create instance
 app = Flask(__name__)
 
-df20_21 = pd.read_csv('20-21.csv')
+df20_21 = pd.read_csv('https://github.com/ShaneMcGinley/FYP_Football/blob/main/20-21.csv?raw=true')
 
 df20_21 = df20_21.drop(df20_21.iloc[:, 24:139], axis=1)
 df20_21 = df20_21.drop(['Div'], axis=1)
