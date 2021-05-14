@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles.css') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <meta charset="UTF-8">
+    <title>LaLiga</title>
+</head>
+<body>
+<h1>Match Predictions for LaLiga 2021</h1>
+
+{% for table in tables %}
+            {{table|safe}}
+{% endfor %}
+
+<br><p align="center"><a href=/ class="button1">Back</a></p>
+</body>
+</html>
